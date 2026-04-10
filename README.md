@@ -56,7 +56,7 @@ Auto-generated bugs use `[Auto]` title prefix, `new` status, and `high`/`critica
 1. Ensure **Xophz COMPASS** is installed and active.
 2. Upload `xophz-compass-bugnet` to `/wp-content/plugins/`.
 3. Activate through the Plugins menu.
-4. Access via the COMPASS dashboard → **Bug Net**.
+4. Access via the My Compass dashboard → **Bug Net**.
 
 ## Frontend Routes
 
