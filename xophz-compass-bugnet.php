@@ -18,7 +18,7 @@
  * Description:       Welcome to the beta group bug catcher! Use this Bug Net to catch bugs you find.      
  * Version:           26.4.14.1311
  * Author:            Hall of the Gods, Inc.
- * Author URI:        http://www.midnightnerd.com/
+ * Author URI:        http://www.hallofthegods.com/
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       xophz-compass-bugnet
