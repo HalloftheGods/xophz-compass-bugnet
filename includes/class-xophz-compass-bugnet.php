@@ -162,13 +162,19 @@ class Xophz_Compass_Bugnet {
 		// $this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		// $this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' ); 
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'addToMenu' );
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'register_settings' );
 
 		$plugin_cpt = new Xophz_Compass_Bugnet_CPT();
 		$this->loader->add_action( 'init', $plugin_cpt, 'register_cpt' );
 		$this->loader->add_action( 'add_meta_boxes', $plugin_cpt, 'add_meta_boxes' );
 		$this->loader->add_action( 'save_post', $plugin_cpt, 'save_meta_box' );
 		$this->loader->add_action( 'rest_api_init', $plugin_cpt, 'register_rest_fields' );
+		$this->loader->add_action( 'rest_api_init', $plugin_cpt, 'register_webhook_route' );
 		$this->loader->add_filter( 'use_block_editor_for_post_type', $plugin_cpt, 'disable_gutenberg', 10, 2 );
+
+		// GitHub Sync Hooks
+		$this->loader->add_action( 'save_post_compass_bug', $plugin_cpt, 'sync_to_github_admin', 20, 3 );
+		$this->loader->add_action( 'rest_after_insert_compass_bug', $plugin_cpt, 'sync_to_github_rest', 10, 3 );
 
 	}
 

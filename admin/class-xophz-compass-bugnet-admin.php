@@ -100,6 +100,35 @@ class Xophz_Compass_Bugnet_Admin {
 
 	}
 
+	public function register_settings() {
+		register_setting( 'xophz_compass_bugnet_github_settings', 'xophz_compass_bugnet_github_owner' );
+		register_setting( 'xophz_compass_bugnet_github_settings', 'xophz_compass_bugnet_github_repo' );
+		register_setting( 
+			'xophz_compass_bugnet_github_settings', 
+			'xophz_compass_bugnet_github_token',
+			array(
+				'sanitize_callback' => array( $this, 'encrypt_token' )
+			)
+		);
+	}
+
+	public function encrypt_token( $token ) {
+		// If the token is empty or consists only of asterisks (unchanged from masked input)
+		if ( empty( $token ) || preg_match( '/^\*+$/', $token ) ) {
+			return get_option( 'xophz_compass_bugnet_github_token' );
+		}
+
+		$key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-256-cbc' ) );
+		$encrypted = openssl_encrypt( $token, 'aes-256-cbc', $key, 0, $iv );
+		
+		return base64_encode( $encrypted . '::' . $iv );
+	}
+
+	public function display_settings_page() {
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/partials/xophz-compass-bugnet-admin-display.php';
+	}
+
 	/**
 	 * Add menu item 
 	 *
@@ -107,6 +136,15 @@ class Xophz_Compass_Bugnet_Admin {
 	 */
 	public function addToMenu(){
         Xophz_Compass::add_submenu($this->plugin_name);
+
+		add_submenu_page(
+			'edit.php?post_type=compass_bug',
+			'GitHub Sync Settings',
+			'GitHub Sync',
+			'manage_options',
+			'bugnet-github-settings',
+			array( $this, 'display_settings_page' )
+		);
 	}
 
 }
