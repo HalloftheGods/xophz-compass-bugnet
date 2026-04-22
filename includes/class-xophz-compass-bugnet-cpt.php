@@ -91,7 +91,7 @@ class Xophz_Compass_Bugnet_CPT {
 			'publicly_queryable'    => true,
 			'capability_type'       => 'post',
 			'show_in_rest'          => true,
-			'menu_icon'             => 'dashicons-bug',
+			'menu_icon'             => plugins_url( '../icon.svg', __FILE__ ),
 		);
 		register_post_type( $this->cpt_name, $args );
 
