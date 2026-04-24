@@ -270,7 +270,8 @@ class Xophz_Compass_Bugnet_CPT {
 			return '';
 		}
 		
-		$key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
 		$data = base64_decode( $encrypted_token );
 		
 		if ( strpos( $data, '::' ) === false ) {
@@ -278,17 +279,18 @@ class Xophz_Compass_Bugnet_CPT {
 		}
 		
 		list( $encrypted_data, $iv ) = explode( '::', $data, 2 );
-		return openssl_decrypt( $encrypted_data, 'aes-256-cbc', $key, 0, $iv );
+		$decrypted = openssl_decrypt( $encrypted_data, 'aes-256-cbc', $key, 0, $iv );
+		return $decrypted !== false ? $decrypted : $encrypted_token;
 	}
 
 	/**
 	 * Performs the actual GitHub API Request
 	 */
-	private function do_github_sync( $post_id ) {
+	public function do_github_sync( $post_id ) {
 		// Check if it already has a GitHub ID (don't duplicate)
 		$github_id = get_post_meta( $post_id, 'bug_github_issue_id', true );
 		if ( ! empty( $github_id ) ) {
-			return;
+			return new WP_Error( 'already_synced', 'Issue is already synced to GitHub.', array( 'status' => 400 ) );
 		}
 
 		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
@@ -297,7 +299,7 @@ class Xophz_Compass_Bugnet_CPT {
 		$token = self::decrypt_token( $encrypted_token );
 
 		if ( empty( $owner ) || empty( $repo ) || empty( $token ) ) {
-			return; // Not configured
+			return new WP_Error( 'not_configured', 'GitHub sync is not configured (missing owner, repo, or token).', array( 'status' => 400 ) );
 		}
 
 		$post = get_post( $post_id );
@@ -325,7 +327,7 @@ class Xophz_Compass_Bugnet_CPT {
 
 		$response = wp_remote_post( $api_url, array(
 			'headers' => array(
-				'Authorization' => 'token ' . $token,
+				'Authorization' => 'Bearer ' . $token,
 				'Accept'        => 'application/vnd.github.v3+json',
 				'Content-Type'  => 'application/json',
 				'User-Agent'    => 'Xophz-COMPASS/1.0',
@@ -335,7 +337,7 @@ class Xophz_Compass_Bugnet_CPT {
 		) );
 
 		if ( is_wp_error( $response ) ) {
-			return;
+			return $response;
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
@@ -345,15 +347,20 @@ class Xophz_Compass_Bugnet_CPT {
 			if ( isset( $data->number ) ) {
 				update_post_meta( $post_id, 'bug_github_issue_id', $data->number );
 				update_post_meta( $post_id, 'bug_github_issue_url', $data->html_url );
+				return true;
 			}
 		} else {
 			$res_body = wp_remote_retrieve_body( $response );
+			$error_msg = "GitHub API Error: HTTP {$response_code}. Body: " . print_r( $res_body, true );
 			error_log( "GitHub Sync Failed for Post {$post_id}. Status: {$response_code}. Body: " . print_r( $res_body, true ) );
+			return new WP_Error( 'github_api_error', $error_msg, array( 'status' => 500 ) );
 		}
+		
+		return new WP_Error( 'unknown_error', 'Unknown error occurred during GitHub sync.', array( 'status' => 500 ) );
 	}
 
 	/**
-	 * Register GitHub Webhook Endpoint
+	 * Register REST API Endpoints
 	 */
 	public function register_webhook_route() {
 		register_rest_route( 'bugnet/v1', '/github-webhook', array(
@@ -361,6 +368,36 @@ class Xophz_Compass_Bugnet_CPT {
 			'callback'            => array( $this, 'handle_github_webhook' ),
 			'permission_callback' => '__return_true', // GitHub sends no WP auth, verify via payload if needed
 		) );
+		
+		register_rest_route( 'bugnet/v1', '/sync/(?P<id>\d+)', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'handle_manual_sync' ),
+			'permission_callback' => function () {
+				return current_user_can( 'edit_posts' );
+			},
+		) );
+	}
+
+	/**
+	 * Handle manual sync request from the frontend
+	 */
+	public function handle_manual_sync( WP_REST_Request $request ) {
+		$post_id = $request->get_param( 'id' );
+		$result = $this->do_github_sync( $post_id );
+		
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response( array(
+				'success' => false,
+				'message' => $result->get_error_message(),
+			), $result->get_error_data()['status'] ?? 500 );
+		}
+		
+		return new WP_REST_Response( array(
+			'success' => true,
+			'message' => 'Successfully synced to GitHub.',
+			'github_issue_id' => get_post_meta( $post_id, 'bug_github_issue_id', true ),
+			'github_issue_url' => get_post_meta( $post_id, 'bug_github_issue_url', true )
+		), 200 );
 	}
 
 	/**

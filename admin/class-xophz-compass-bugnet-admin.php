@@ -118,7 +118,8 @@ class Xophz_Compass_Bugnet_Admin {
 			return get_option( 'xophz_compass_bugnet_github_token' );
 		}
 
-		$key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
 		$iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-256-cbc' ) );
 		$encrypted = openssl_encrypt( $token, 'aes-256-cbc', $key, 0, $iv );
 		
