@@ -328,6 +328,7 @@ class Xophz_Compass_Bugnet_CPT {
 				'Authorization' => 'token ' . $token,
 				'Accept'        => 'application/vnd.github.v3+json',
 				'Content-Type'  => 'application/json',
+				'User-Agent'    => 'Xophz-COMPASS/1.0',
 			),
 			'body'        => wp_json_encode( $payload ),
 			'data_format' => 'body',
@@ -345,6 +346,9 @@ class Xophz_Compass_Bugnet_CPT {
 				update_post_meta( $post_id, 'bug_github_issue_id', $data->number );
 				update_post_meta( $post_id, 'bug_github_issue_url', $data->html_url );
 			}
+		} else {
+			$res_body = wp_remote_retrieve_body( $response );
+			error_log( "GitHub Sync Failed for Post {$post_id}. Status: {$response_code}. Body: " . print_r( $res_body, true ) );
 		}
 	}
 

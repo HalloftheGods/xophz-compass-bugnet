@@ -22,15 +22,49 @@
 			<tr valign="top">
 				<th scope="row">GitHub Repository Owner</th>
 				<td>
-					<input type="text" name="xophz_compass_bugnet_github_owner" value="<?php echo esc_attr( get_option('xophz_compass_bugnet_github_owner') ); ?>" class="regular-text" placeholder="e.g., HalloftheGods" />
+					<input type="text" id="github_owner_input" name="xophz_compass_bugnet_github_owner" value="<?php echo esc_attr( get_option('xophz_compass_bugnet_github_owner') ); ?>" class="regular-text" placeholder="e.g., HalloftheGods" />
 					<p class="description">The organization or user that owns the repository.</p>
 				</td>
 			</tr>
 			<tr valign="top">
 				<th scope="row">GitHub Repository Name</th>
 				<td>
-					<input type="text" name="xophz_compass_bugnet_github_repo" value="<?php echo esc_attr( get_option('xophz_compass_bugnet_github_repo') ); ?>" class="regular-text" placeholder="e.g., Xophz-COMPASS" />
+					<input type="text" id="github_repo_input" name="xophz_compass_bugnet_github_repo" value="<?php echo esc_attr( get_option('xophz_compass_bugnet_github_repo') ); ?>" class="regular-text" placeholder="e.g., Xophz-COMPASS" />
 					<p class="description">The name of the repository.</p>
+				</td>
+			</tr>
+			<tr valign="top">
+				<th scope="row">Verify Repository</th>
+				<td>
+					<p class="description">
+						<?php 
+							$owner = get_option('xophz_compass_bugnet_github_owner') ?: 'owner';
+							$repo = get_option('xophz_compass_bugnet_github_repo') ?: 'repo';
+						?>
+						<a id="github_verify_link" href="https://github.com/<?php echo esc_attr( $owner ); ?>/<?php echo esc_attr( $repo ); ?>" target="_blank">
+							Verify connection to https://github.com/<?php echo esc_attr( $owner ); ?>/<?php echo esc_attr( $repo ); ?>
+						</a>
+					</p>
+					<script>
+						document.addEventListener('DOMContentLoaded', function() {
+							const ownerInput = document.getElementById('github_owner_input');
+							const repoInput = document.getElementById('github_repo_input');
+							const verifyLink = document.getElementById('github_verify_link');
+							
+							function updateLink() {
+								const owner = ownerInput.value || 'owner';
+								const repo = repoInput.value || 'repo';
+								const url = `https://github.com/${owner}/${repo}`;
+								verifyLink.href = url;
+								verifyLink.textContent = `Verify connection to ${url}`;
+							}
+							
+							if (ownerInput && repoInput && verifyLink) {
+								ownerInput.addEventListener('input', updateLink);
+								repoInput.addEventListener('input', updateLink);
+							}
+						});
+					</script>
 				</td>
 			</tr>
 			<tr valign="top">
