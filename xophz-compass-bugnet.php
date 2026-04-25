@@ -14,7 +14,7 @@
  * @wordpress-plugin
  * Category:          Wizard's Tower
  * Plugin Name:       Xophz Bug-Catching Net 
- * Plugin URI:        http://www.mycompassconsulting.com/
+ * Plugin URI:        https://github.com/HalloftheGods/xophz-compass-bugnet
  * Description:       Welcome to the beta group bug catcher! Use this Bug Net to catch bugs you find.      
  * Version:           26.4.24.325
  * Author:            Hall of the Gods, Inc.
