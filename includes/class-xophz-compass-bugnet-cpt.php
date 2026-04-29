@@ -257,7 +257,7 @@ class Xophz_Compass_Bugnet_CPT {
 	 * Trigger GitHub Sync on REST API Insert
 	 */
 	public function sync_to_github_rest( $post, $request, $creating ) {
-		if ( $creating && $post->post_status === 'publish' ) {
+		if ( $post->post_status === 'publish' || $post->post_status === 'trash' ) {
 			$this->do_github_sync( $post->ID );
 		}
 	}
