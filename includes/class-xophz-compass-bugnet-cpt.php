@@ -76,7 +76,7 @@ class Xophz_Compass_Bugnet_CPT {
 			'label'                 => __( 'Bug', 'xophz-compass-bugnet' ),
 			'description'           => __( 'Bugs and Issues for the Bug Net system', 'xophz-compass-bugnet' ),
 			'labels'                => $labels,
-			'supports'              => array( 'title', 'editor', 'author', 'custom-fields' ),
+			'supports'              => array( 'title', 'editor', 'author', 'custom-fields', 'comments' ),
 			'taxonomies'            => array(),
 			'hierarchical'          => false,
 			'public'                => true,
@@ -127,6 +127,7 @@ class Xophz_Compass_Bugnet_CPT {
 		$url = get_post_meta( $post->ID, 'bug_url', true );
 		$plugin = get_post_meta( $post->ID, 'bug_plugin', true );
 		$emoji = get_post_meta( $post->ID, 'bug_emoji', true );
+		$bug_type = get_post_meta( $post->ID, 'bug_type', true );
 
 		// Nonce field for security
 		wp_nonce_field( 'xophz_compass_bugnet_save_meta_box', 'xophz_compass_bugnet_meta_box_nonce' );
@@ -169,6 +170,11 @@ class Xophz_Compass_Bugnet_CPT {
 			<label for="bug_emoji" style="display:block; font-weight:bold;">Bug Emoji</label>
 			<input type="text" id="bug_emoji" name="bug_emoji" value="<?php echo esc_attr( $emoji ); ?>" style="width:100%;" placeholder="e.g., 🦋">
 			<span class="description">The caught bug emoji for gamification.</span>
+		</p>
+		<p>
+			<label for="bug_type" style="display:block; font-weight:bold;">Bug Type (Species)</label>
+			<input type="text" id="bug_type" name="bug_type" value="<?php echo esc_attr( $bug_type ); ?>" style="width:100%;" placeholder="e.g., butterfly">
+			<span class="description">The species identifier for this bug.</span>
 		</p>
 		<?php
 	}
@@ -214,6 +220,9 @@ class Xophz_Compass_Bugnet_CPT {
 		if ( isset( $_POST['bug_emoji'] ) ) {
 			update_post_meta( $post_id, 'bug_emoji', sanitize_text_field( $_POST['bug_emoji'] ) );
 		}
+		if ( isset( $_POST['bug_type'] ) ) {
+			update_post_meta( $post_id, 'bug_type', sanitize_text_field( $_POST['bug_type'] ) );
+		}
 	}
 
 	/**
@@ -221,7 +230,7 @@ class Xophz_Compass_Bugnet_CPT {
 	 * This makes custom meta available directly in the JSON response
 	 */
 	public function register_rest_fields() {
-		$fields = array( 'bug_status', 'bug_priority', 'bug_environment', 'bug_url', 'bug_plugin', 'bug_emoji' );
+		$fields = array( 'bug_status', 'bug_priority', 'bug_environment', 'bug_url', 'bug_plugin', 'bug_emoji', 'bug_type', 'bug_species_name' );
 
 		foreach ( $fields as $field ) {
 			register_rest_field(
@@ -287,16 +296,16 @@ class Xophz_Compass_Bugnet_CPT {
 	 * Performs the actual GitHub API Request
 	 */
 	public function do_github_sync( $post_id ) {
-		// Check if it already has a GitHub ID (don't duplicate)
 		$github_id = get_post_meta( $post_id, 'bug_github_issue_id', true );
-		if ( ! empty( $github_id ) ) {
-			return new WP_Error( 'already_synced', 'Issue is already synced to GitHub.', array( 'status' => 400 ) );
-		}
+		$is_update = ! empty( $github_id );
 
 		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
-		$repo  = get_option( 'xophz_compass_bugnet_github_repo' );
+		$global_repo  = get_option( 'xophz_compass_bugnet_github_repo' );
 		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
 		$token = self::decrypt_token( $encrypted_token );
+
+		$plugin_repo = get_post_meta( $post_id, 'bug_plugin', true );
+		$repo = ! empty( $plugin_repo ) ? $plugin_repo : $global_repo;
 
 		if ( empty( $owner ) || empty( $repo ) || empty( $token ) ) {
 			return new WP_Error( 'not_configured', 'GitHub sync is not configured (missing owner, repo, or token).', array( 'status' => 400 ) );
@@ -309,23 +318,42 @@ class Xophz_Compass_Bugnet_CPT {
 		$environment = get_post_meta( $post_id, 'bug_environment', true ) ?: 'N/A';
 		$url         = get_post_meta( $post_id, 'bug_url', true ) ?: 'N/A';
 		$plugin      = get_post_meta( $post_id, 'bug_plugin', true ) ?: 'N/A';
+		$bug_type    = get_post_meta( $post_id, 'bug_type', true ) ?: 'unknown';
+		$bug_emoji   = get_post_meta( $post_id, 'bug_emoji', true ) ?: '🐛';
+		$bug_name    = get_post_meta( $post_id, 'bug_species_name', true ) ?: ucfirst( $bug_type );
+
+		$bug_status  = get_post_meta( $post_id, 'bug_status', true ) ?: 'new';
 
 		$body = $post->post_content . "\n\n" .
+				"**Species:** " . $bug_emoji . " " . $bug_name . "\n" .
 				"**Priority:** " . esc_html( $priority ) . "\n" .
 				"**Environment:** " . esc_html( $environment ) . "\n" .
 				"**URL/Route:** " . esc_url( $url ) . "\n" .
 				"**Plugin:** " . esc_html( $plugin ) . "\n" .
 				"**Reporter:** " . esc_html( get_the_author_meta( 'display_name', $post->post_author ) );
 
+		$labels = array( 'bug', 'priority: ' . $priority );
+		if ( ! empty( $bug_name ) && $bug_name !== 'Unknown' ) {
+			$labels[] = $bug_emoji . ' ' . $bug_name;
+		}
+
 		$payload = array(
-			'title'  => $post->post_title,
+			'title'  => $bug_emoji . ' ' . $post->post_title,
 			'body'   => $body,
-			'labels' => array( 'bug', 'priority: ' . $priority )
+			'labels' => $labels,
+			'state'  => ( in_array( $bug_status, array('resolved', 'closed', 'trash') ) || $post->post_status === 'trash' ) ? 'closed' : 'open'
 		);
 
-		$api_url = "https://api.github.com/repos/{$owner}/{$repo}/issues";
+		if ( $is_update ) {
+			$api_url = "https://api.github.com/repos/{$owner}/{$repo}/issues/{$github_id}";
+			$method = 'PATCH';
+		} else {
+			$api_url = "https://api.github.com/repos/{$owner}/{$repo}/issues";
+			$method = 'POST';
+		}
 
-		$response = wp_remote_post( $api_url, array(
+		$response = wp_remote_request( $api_url, array(
+			'method'      => $method,
 			'headers' => array(
 				'Authorization' => 'Bearer ' . $token,
 				'Accept'        => 'application/vnd.github.v3+json',
@@ -341,14 +369,14 @@ class Xophz_Compass_Bugnet_CPT {
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
-		if ( 201 === $response_code ) {
+		if ( 201 === $response_code || 200 === $response_code ) {
 			$res_body = wp_remote_retrieve_body( $response );
 			$data = json_decode( $res_body );
-			if ( isset( $data->number ) ) {
+			if ( ! $is_update && isset( $data->number ) ) {
 				update_post_meta( $post_id, 'bug_github_issue_id', $data->number );
 				update_post_meta( $post_id, 'bug_github_issue_url', $data->html_url );
-				return true;
 			}
+			return true;
 		} else {
 			$res_body = wp_remote_retrieve_body( $response );
 			$error_msg = "GitHub API Error: HTTP {$response_code}. Body: " . print_r( $res_body, true );
@@ -376,6 +404,22 @@ class Xophz_Compass_Bugnet_CPT {
 				return current_user_can( 'edit_posts' );
 			},
 		) );
+
+		register_rest_route( 'bugnet/v1', '/test-github', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'handle_test_github' ),
+			'permission_callback' => function () {
+				return current_user_can( 'manage_options' );
+			},
+		) );
+
+		register_rest_route( 'bugnet/v1', '/repos', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'handle_get_repos' ),
+			'permission_callback' => function () {
+				return is_user_logged_in();
+			},
+		) );
 	}
 
 	/**
@@ -398,6 +442,99 @@ class Xophz_Compass_Bugnet_CPT {
 			'github_issue_id' => get_post_meta( $post_id, 'bug_github_issue_id', true ),
 			'github_issue_url' => get_post_meta( $post_id, 'bug_github_issue_url', true )
 		), 200 );
+	}
+
+	/**
+	 * Handle GitHub Connection Test
+	 */
+	public function handle_test_github( WP_REST_Request $request ) {
+		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
+		$repo = get_option( 'xophz_compass_bugnet_github_repo' );
+		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
+
+		if ( ! $owner || ! $repo || ! $encrypted_token ) {
+			return new WP_REST_Response( array(
+				'success' => false,
+				'message' => 'Missing GitHub Owner, Repo, or Token.'
+			), 400 );
+		}
+
+		$parts = explode( '::', base64_decode( $encrypted_token ) );
+		if ( count( $parts ) !== 2 ) {
+			return new WP_REST_Response( array(
+				'success' => false,
+				'message' => 'Invalid token format.'
+			), 400 );
+		}
+
+		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
+		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
+		$token = openssl_decrypt( $parts[0], 'aes-256-cbc', $key, 0, $parts[1] );
+
+		$api_url = "https://api.github.com/repos/{$owner}/{$repo}";
+		$args = array(
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $token,
+				'Accept'        => 'application/vnd.github.v3+json',
+				'User-Agent'    => 'WordPress/Xophz-COMPASS-Bugnet',
+			),
+			'timeout' => 15,
+		);
+
+		$response = wp_remote_get( $api_url, $args );
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_REST_Response( array(
+				'success' => false,
+				'message' => 'HTTP request failed: ' . $response->get_error_message()
+			), 500 );
+		}
+
+		$response_code = wp_remote_retrieve_response_code( $response );
+		$body = json_decode( wp_remote_retrieve_body( $response ) );
+
+		if ( $response_code === 200 ) {
+			return new WP_REST_Response( array(
+				'success' => true,
+				'message' => 'Connection successful! Verified access to ' . $body->full_name . ' (Permissions: ' . (isset($body->permissions->push) && $body->permissions->push ? 'Write' : 'Read-only') . ')'
+			), 200 );
+		} else {
+			return new WP_REST_Response( array(
+				'success' => false,
+				'message' => 'GitHub API Error ' . $response_code . ': ' . ($body->message ?? 'Unknown Error')
+			), 400 );
+		}
+	}
+
+	/**
+	 * Fetch installed COMPASS plugins locally
+	 */
+	public function handle_get_repos( WP_REST_Request $request ) {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		
+		$installed_plugins = get_plugins();
+		$repos = array();
+		
+		foreach ( $installed_plugins as $plugin_file => $plugin_data ) {
+			$slug = dirname( $plugin_file );
+			if ( strpos( $slug, 'xophz-compass' ) === 0 ) {
+				$name = $plugin_data['Name'];
+				// Clean up the name
+				$name = str_replace( 'Xophz COMPASS - ', '', $name );
+				$name = str_replace( 'Xophz COMPASS', 'COMPASS Core Suite', $name );
+				$name = str_replace( 'Xophz ', '', $name );
+				
+				$repos[] = array(
+					'name'        => $name,
+					'value'       => $slug,
+					'description' => $plugin_data['Description']
+				);
+			}
+		}
+
+		return new WP_REST_Response( $repos, 200 );
 	}
 
 	/**
@@ -460,5 +597,86 @@ class Xophz_Compass_Bugnet_CPT {
 		}
 
 		return new WP_REST_Response( 'Webhook processed', 200 );
+	}
+
+	public function sync_comment_to_github( $comment_id, $comment_approved ) {
+		if ( $comment_approved !== 1 && $comment_approved !== '1' ) {
+			return;
+		}
+
+		$comment = get_comment( $comment_id );
+		if ( ! $comment ) {
+			return;
+		}
+
+		$this->do_github_comment_sync( $comment );
+	}
+
+	public function sync_comment_to_github_rest( $comment, $request, $creating ) {
+		if ( ! $creating ) {
+			return;
+		}
+		$approved = $comment->comment_approved;
+		if ( $approved == 1 || $approved === '1' ) {
+			$this->do_github_comment_sync( $comment );
+		}
+	}
+
+	private function do_github_comment_sync( $comment ) {
+		$post_id   = $comment->comment_post_ID;
+		$post_type = get_post_type( $post_id );
+		$isNotBugPost = $post_type !== $this->cpt_name;
+		if ( $isNotBugPost ) {
+			return;
+		}
+
+		$isFromGitHub = strpos( $comment->comment_author, 'GitHub:' ) === 0;
+		if ( $isFromGitHub ) {
+			return;
+		}
+
+		$github_issue_id = get_post_meta( $post_id, 'bug_github_issue_id', true );
+		$hasNoGitHubLink = empty( $github_issue_id );
+		if ( $hasNoGitHubLink ) {
+			return;
+		}
+
+		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
+		$repo  = get_option( 'xophz_compass_bugnet_github_repo' );
+		$plugin_repo = get_post_meta( $post_id, 'bug_plugin', true );
+		if ( ! empty( $plugin_repo ) ) {
+			$repo = $plugin_repo;
+		}
+
+		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
+		$token = self::decrypt_token( $encrypted_token );
+
+		$isMissingConfig = empty( $owner ) || empty( $repo ) || empty( $token );
+		if ( $isMissingConfig ) {
+			return;
+		}
+
+		$user_id      = $comment->user_id;
+		$display_name = ! empty( $user_id ) ? get_the_author_meta( 'display_name', $user_id ) : $comment->comment_author;
+		$email        = ! empty( $user_id ) ? get_the_author_meta( 'user_email', $user_id ) : $comment->comment_author_email;
+		$avatar_url   = get_avatar_url( $email, array( 'size' => 40 ) );
+		$content      = $comment->comment_content;
+
+		$body = "<img src=\"{$avatar_url}\" width=\"20\" height=\"20\" style=\"border-radius:50%; vertical-align:middle;\" /> "
+			. "**{$display_name}** commented via COMPASS:\n\n"
+			. "> " . str_replace( "\n", "\n> ", $content );
+
+		$api_url = "https://api.github.com/repos/{$owner}/{$repo}/issues/{$github_issue_id}/comments";
+
+		wp_remote_post( $api_url, array(
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $token,
+				'Accept'        => 'application/vnd.github.v3+json',
+				'Content-Type'  => 'application/json',
+				'User-Agent'    => 'Xophz-COMPASS/1.0',
+			),
+			'body'        => wp_json_encode( array( 'body' => $body ) ),
+			'data_format' => 'body',
+		) );
 	}
 }

@@ -175,6 +175,8 @@ class Xophz_Compass_Bugnet {
 		// GitHub Sync Hooks
 		$this->loader->add_action( 'save_post_compass_bug', $plugin_cpt, 'sync_to_github_admin', 20, 3 );
 		$this->loader->add_action( 'rest_after_insert_compass_bug', $plugin_cpt, 'sync_to_github_rest', 10, 3 );
+		$this->loader->add_action( 'comment_post', $plugin_cpt, 'sync_comment_to_github', 10, 2 );
+		$this->loader->add_action( 'rest_insert_comment', $plugin_cpt, 'sync_comment_to_github_rest', 10, 3 );
 
 	}
 

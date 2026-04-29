@@ -79,6 +79,53 @@
 				</td>
 			</tr>
 		</table>
-		<?php submit_button(); ?>
+		<div style="display: flex; gap: 10px; align-items: center; margin-top: 20px;">
+			<?php submit_button('', 'primary', 'submit', false); ?>
+			<button type="button" id="github_test_connection" class="button button-secondary">Test Connection</button>
+			<span id="github_test_result" style="font-weight: 500; display: inline-block;"></span>
+		</div>
 	</form>
+
+	<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			const testBtn = document.getElementById('github_test_connection');
+			const testResult = document.getElementById('github_test_result');
+			const nonce = '<?php echo esc_js( wp_create_nonce("wp_rest") ); ?>';
+
+			if (testBtn) {
+				testBtn.addEventListener('click', function(e) {
+					e.preventDefault();
+					
+					testBtn.disabled = true;
+					testResult.style.color = '';
+					testResult.textContent = 'Testing connection...';
+					
+					fetch('/wp-json/bugnet/v1/test-github', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'X-WP-Nonce': nonce
+						}
+					})
+					.then(response => response.json())
+					.then(data => {
+						if (data.success) {
+							testResult.style.color = 'green';
+							testResult.textContent = '✅ ' + data.message;
+						} else {
+							testResult.style.color = 'red';
+							testResult.textContent = '❌ ' + (data.message || 'Unknown error');
+						}
+					})
+					.catch(error => {
+						testResult.style.color = 'red';
+						testResult.textContent = '❌ Request failed: ' + error.message;
+					})
+					.finally(() => {
+						testBtn.disabled = false;
+					});
+				});
+			}
+		});
+	</script>
 </div>
