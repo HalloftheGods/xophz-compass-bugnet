@@ -322,7 +322,29 @@ class Xophz_Compass_Bugnet_CPT {
 		$url         = get_post_meta( $post_id, 'bug_url', true ) ?: 'N/A';
 		$plugin      = get_post_meta( $post_id, 'bug_plugin', true ) ?: 'N/A';
 		$bug_type    = get_post_meta( $post_id, 'bug_type', true ) ?: 'unknown';
-		$bug_emoji   = get_post_meta( $post_id, 'bug_emoji', true ) ?: '🐛';
+		
+		$emoji_map = array(
+			'microbe'     => '🦠',
+			'lady-bug'    => '🐞',
+			'butterfly'   => '🦋',
+			'ant'         => '🐜',
+			'cricket'     => '🦗',
+			'fly'         => '🪰',
+			'mosquito'    => '🦟',
+			'beetle'      => '🪲',
+			'snail'       => '🐌',
+			'caterpillar' => '🐛',
+			'cockroach'   => '🪳',
+			'spider'      => '🕷️',
+			'worm'        => '🪱',
+			'bee'         => '🐝',
+			'scorpion'    => '🦂',
+		);
+		$bug_emoji = get_post_meta( $post_id, 'bug_emoji', true );
+		if ( empty( $bug_emoji ) ) {
+			$bug_emoji = isset( $emoji_map[ $bug_type ] ) ? $emoji_map[ $bug_type ] : '🐛';
+		}
+
 		$bug_name    = get_post_meta( $post_id, 'bug_species_name', true ) ?: ucfirst( $bug_type );
 
 		$bug_status  = get_post_meta( $post_id, 'bug_status', true ) ?: 'new';
