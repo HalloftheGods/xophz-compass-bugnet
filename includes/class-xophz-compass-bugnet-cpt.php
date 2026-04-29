@@ -266,6 +266,9 @@ class Xophz_Compass_Bugnet_CPT {
 	 * Trigger GitHub Sync on Admin Save
 	 */
 	public function sync_to_github_admin( $post_id, $post, $update ) {
+		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			return; // Handled by sync_to_github_rest after meta is saved
+		}
 		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
 			return;
 		}
@@ -336,9 +339,17 @@ class Xophz_Compass_Bugnet_CPT {
 		if ( ! empty( $bug_name ) && $bug_name !== 'Unknown' ) {
 			$labels[] = $bug_emoji . ' ' . $bug_name;
 		}
+		if ( ! empty( $plugin_repo ) && $plugin_repo !== $global_repo ) {
+			$labels[] = 'plugin: ' . $plugin_repo;
+		}
+
+		$title = $post->post_title;
+		if ( strpos( $title, $bug_emoji ) !== 0 ) {
+			$title = $bug_emoji . ' ' . $title;
+		}
 
 		$payload = array(
-			'title'  => $bug_emoji . ' ' . $post->post_title,
+			'title'  => $title,
 			'body'   => $body,
 			'labels' => $labels,
 			'state'  => ( in_array( $bug_status, array('resolved', 'closed', 'trash') ) || $post->post_status === 'trash' ) ? 'closed' : 'open'
@@ -375,6 +386,16 @@ class Xophz_Compass_Bugnet_CPT {
 			if ( ! $is_update && isset( $data->number ) ) {
 				update_post_meta( $post_id, 'bug_github_issue_id', $data->number );
 				update_post_meta( $post_id, 'bug_github_issue_url', $data->html_url );
+			}
+			if ( isset( $data->title ) && $data->title !== $post->post_title ) {
+				global $wpdb;
+				$wpdb->update(
+					$wpdb->posts,
+					array( 'post_title' => $data->title ),
+					array( 'ID' => $post_id ),
+					array( '%s' ),
+					array( '%d' )
+				);
 			}
 			return true;
 		} else {
@@ -573,6 +594,20 @@ class Xophz_Compass_Bugnet_CPT {
 			} elseif ( $payload->action === 'reopened' ) {
 				update_post_meta( $post_id, 'bug_status', 'in-progress' );
 			}
+
+			if ( in_array( $payload->action, array( 'edited', 'opened', 'reopened' ) ) && isset( $payload->issue->title ) ) {
+				$post_title = get_the_title( $post_id );
+				if ( $post_title !== $payload->issue->title ) {
+					global $wpdb;
+					$wpdb->update(
+						$wpdb->posts,
+						array( 'post_title' => $payload->issue->title ),
+						array( 'ID' => $post_id ),
+						array( '%s' ),
+						array( '%d' )
+					);
+				}
+			}
 		}
 
 		// Handle Issue Comments
@@ -659,11 +694,26 @@ class Xophz_Compass_Bugnet_CPT {
 		$user_id      = $comment->user_id;
 		$display_name = ! empty( $user_id ) ? get_the_author_meta( 'display_name', $user_id ) : $comment->comment_author;
 		$email        = ! empty( $user_id ) ? get_the_author_meta( 'user_email', $user_id ) : $comment->comment_author_email;
-		$avatar_url   = get_avatar_url( $email, array( 'size' => 40 ) );
+		$avatar_url   = get_avatar_url( $email, array( 'size' => 50 ) );
 		$content      = $comment->comment_content;
+		$quote_block  = "";
 
-		$body = "<img src=\"{$avatar_url}\" width=\"20\" height=\"20\" style=\"border-radius:50%; vertical-align:middle;\" /> "
-			. "**{$display_name}** commented via COMPASS:\n\n"
+		if ( ! empty( $comment->comment_parent ) ) {
+			$parent_comment = get_comment( $comment->comment_parent );
+			if ( $parent_comment ) {
+				$parent_author = str_replace( 'GitHub: ', '', $parent_comment->comment_author );
+				$parent_text   = $parent_comment->comment_content;
+				
+				$quote_block = ">> **Replying to {$parent_author}:**\n"
+					. ">> *" . str_replace( "\n", "*\n>> *", $parent_text ) . "*\n\n";
+			}
+		}
+
+		$site_domain  = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		$body = "<img src=\"{$avatar_url}\" style=\"vertical-align:middle;\" align=\"right\" height=\"100\"/> "
+			. "**{$display_name}** commented - via My Compass @ {$site_domain}\n\n"
+			. $quote_block
 			. "> " . str_replace( "\n", "\n> ", $content );
 
 		$api_url = "https://api.github.com/repos/{$owner}/{$repo}/issues/{$github_issue_id}/comments";
