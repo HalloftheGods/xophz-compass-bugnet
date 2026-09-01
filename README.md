@@ -6,7 +6,7 @@ The official bug-catching and tracking engine for the COMPASS platform.
 
 ## Description
 
-**Bug-Catching Net** leverages a dedicated WordPress Custom Post Type (`compass_bug`) to log, monitor, and resolve system issues. It acts as an integrated issue tracker with automatic runtime error interception — catching bugs before users even report them.
+**Bug-Catching Net** leverages a dedicated WordPress Custom Post Type (`compass_bug`) to log, monitor, and resolve system issues. It acts as an integrated issue tracker with automatic runtime error interception - catching bugs before users even report them.
 
 ### Core Capabilities
 
