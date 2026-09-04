@@ -53,8 +53,7 @@ function activate_xophz_compass_bugnet() {
  * This action is documented in includes/class-xophz-compass-bugnet-deactivator.php
  */
 function deactivate_xophz_compass_bugnet() {
-	require_once plugin_dir_path( __FILE__ ) . 'includes/class-xophz-compass-bugnet-deactivator.php';
-	Xophz_Compass_Bugnet_Deactivator::deactivate();
+	Xophz_Compass_Bugnet::deactivate();
 }
 
 register_activation_hook( __FILE__, 'activate_xophz_compass_bugnet' );
