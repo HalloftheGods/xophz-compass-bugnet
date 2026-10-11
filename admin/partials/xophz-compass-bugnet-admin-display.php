@@ -70,12 +70,14 @@
 			<tr valign="top">
 				<th scope="row">GitHub Personal Access Token (PAT)</th>
 				<td>
-					<?php 
-						$token = get_option('xophz_compass_bugnet_github_token');
-						$masked_token = !empty($token) ? str_repeat('*', 16) : '';
-					?>
-					<input type="password" name="xophz_compass_bugnet_github_token" value="<?php echo esc_attr( $masked_token ); ?>" class="regular-text" />
-					<p class="description">Requires <strong>repo</strong> scope to create issues and webhooks.</p>
+					<p>
+						<strong><?php echo Xophz_Compass_Bugnet_GitHub_Token::is_configured() ? 'Configured' : 'Not configured'; ?></strong>
+					</p>
+					<p class="description">
+						The token is managed as the <strong>GitHub Token</strong> connector in
+						<a href="<?php echo esc_url( Xophz_Compass_Bugnet_GitHub_Token::connectors_url() ); ?>">Settings &gt; Connectors</a>.
+						It requires <strong>repo</strong> scope to create issues and webhooks.
+					</p>
 				</td>
 			</tr>
 		</table>

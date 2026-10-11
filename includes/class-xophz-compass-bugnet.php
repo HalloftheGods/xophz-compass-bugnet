@@ -135,6 +135,11 @@ class Xophz_Compass_Bugnet extends Xophz_Compass_Plugin_Base {
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-xophz-compass-bugnet-cpt.php';
 
+		/**
+		 * The GitHub token, held in the WordPress Connectors API.
+		 */
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-xophz-compass-bugnet-github-token.php';
+
 
 	}
 
@@ -166,6 +171,10 @@ class Xophz_Compass_Bugnet extends Xophz_Compass_Plugin_Base {
 		// $this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' ); 
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'addToMenu' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'register_settings' );
+
+		// GitHub token lives in Settings > Connectors; move any pre-Connectors token across once.
+		add_action( 'wp_connectors_init', array( 'Xophz_Compass_Bugnet_GitHub_Token', 'register' ) );
+		add_action( 'admin_init', array( 'Xophz_Compass_Bugnet_GitHub_Token', 'migrate_legacy_token' ) );
 
 		$plugin_cpt = new Xophz_Compass_Bugnet_CPT();
 		$this->loader->add_action( 'init', $plugin_cpt, 'register_cpt' );

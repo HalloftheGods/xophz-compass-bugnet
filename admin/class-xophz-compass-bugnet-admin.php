@@ -103,27 +103,6 @@ class Xophz_Compass_Bugnet_Admin {
 	public function register_settings() {
 		register_setting( 'xophz_compass_bugnet_github_settings', 'xophz_compass_bugnet_github_owner' );
 		register_setting( 'xophz_compass_bugnet_github_settings', 'xophz_compass_bugnet_github_repo' );
-		register_setting( 
-			'xophz_compass_bugnet_github_settings', 
-			'xophz_compass_bugnet_github_token',
-			array(
-				'sanitize_callback' => array( $this, 'encrypt_token' )
-			)
-		);
-	}
-
-	public function encrypt_token( $token ) {
-		// If the token is empty or consists only of asterisks (unchanged from masked input)
-		if ( empty( $token ) || preg_match( '/^\*+$/', $token ) ) {
-			return get_option( 'xophz_compass_bugnet_github_token' );
-		}
-
-		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
-		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
-		$iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-256-cbc' ) );
-		$encrypted = openssl_encrypt( $token, 'aes-256-cbc', $key, 0, $iv );
-		
-		return base64_encode( $encrypted . '::' . $iv );
 	}
 
 	public function display_settings_page() {

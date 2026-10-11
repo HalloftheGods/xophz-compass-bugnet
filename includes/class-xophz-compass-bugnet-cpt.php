@@ -277,24 +277,6 @@ class Xophz_Compass_Bugnet_CPT {
 		}
 	}
 
-	public static function decrypt_token( $encrypted_token ) {
-		if ( empty( $encrypted_token ) ) {
-			return '';
-		}
-		
-		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
-		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
-		$data = base64_decode( $encrypted_token );
-		
-		if ( strpos( $data, '::' ) === false ) {
-			return $encrypted_token; // Fallback for old unencrypted tokens or broken strings
-		}
-		
-		list( $encrypted_data, $iv ) = explode( '::', $data, 2 );
-		$decrypted = openssl_decrypt( $encrypted_data, 'aes-256-cbc', $key, 0, $iv );
-		return $decrypted !== false ? $decrypted : $encrypted_token;
-	}
-
 	/**
 	 * Performs the actual GitHub API Request
 	 */
@@ -304,8 +286,7 @@ class Xophz_Compass_Bugnet_CPT {
 
 		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
 		$global_repo  = get_option( 'xophz_compass_bugnet_github_repo' );
-		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
-		$token = self::decrypt_token( $encrypted_token );
+		$token = Xophz_Compass_Bugnet_GitHub_Token::get();
 
 		$plugin_repo = get_post_meta( $post_id, 'bug_plugin', true );
 		$repo = ! empty( $plugin_repo ) ? $plugin_repo : $global_repo;
@@ -493,26 +474,14 @@ class Xophz_Compass_Bugnet_CPT {
 	public function handle_test_github( WP_REST_Request $request ) {
 		$owner = get_option( 'xophz_compass_bugnet_github_owner' );
 		$repo = get_option( 'xophz_compass_bugnet_github_repo' );
-		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
+		$token = Xophz_Compass_Bugnet_GitHub_Token::get();
 
-		if ( ! $owner || ! $repo || ! $encrypted_token ) {
+		if ( ! $owner || ! $repo || ! $token ) {
 			return new WP_REST_Response( array(
 				'success' => false,
-				'message' => 'Missing GitHub Owner, Repo, or Token.'
+				'message' => 'Missing GitHub Owner, Repo, or Token. Set the token in Settings > Connectors.'
 			), 400 );
 		}
-
-		$parts = explode( '::', base64_decode( $encrypted_token ) );
-		if ( count( $parts ) !== 2 ) {
-			return new WP_REST_Response( array(
-				'success' => false,
-				'message' => 'Invalid token format.'
-			), 400 );
-		}
-
-		$raw_key = defined( 'SECURE_AUTH_KEY' ) ? SECURE_AUTH_KEY : 'default_fallback_key_xophz_bugnet';
-		$key = substr( hash( 'sha256', $raw_key ), 0, 32 );
-		$token = openssl_decrypt( $parts[0], 'aes-256-cbc', $key, 0, $parts[1] );
 
 		$api_url = "https://api.github.com/repos/{$owner}/{$repo}";
 		$args = array(
@@ -705,8 +674,7 @@ class Xophz_Compass_Bugnet_CPT {
 			$repo = $plugin_repo;
 		}
 
-		$encrypted_token = get_option( 'xophz_compass_bugnet_github_token' );
-		$token = self::decrypt_token( $encrypted_token );
+		$token = Xophz_Compass_Bugnet_GitHub_Token::get();
 
 		$isMissingConfig = empty( $owner ) || empty( $repo ) || empty( $token );
 		if ( $isMissingConfig ) {
